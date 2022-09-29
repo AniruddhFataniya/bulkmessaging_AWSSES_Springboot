@@ -4,7 +4,6 @@ import com.rishabhsoft.bulkmessaging.model.BulkEmailWithTemplate;
 import com.rishabhsoft.bulkmessaging.model.Email;
 import com.rishabhsoft.bulkmessaging.model.EmailTemplate;
 import com.rishabhsoft.bulkmessaging.model.EmailWithTemplate;
-import org.apache.catalina.users.SparseUserDatabase;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.*;
@@ -78,22 +77,11 @@ public class SESServiceImpl implements SESService{
 
     }
 
-    public List<String> getRecipients(){
-
-        List<String> list = new ArrayList<String>();
-        list.add("lipsapatra23@gmail.com");
-        list.add("lipsapatra.daisy1992@gmail.com");
-        list.add("tech.lipsa20@gmail.com");
-        return list;
-
-
-    }
-
     @Override
     public void sendBulkEmail(SesClient client, BulkEmailWithTemplate bulkEmailWithTemplate) {
 
-        List<BulkEmailDestination> bulkEmailDestinationList = new ArrayList<BulkEmailDestination>();
-        SendBulkTemplatedEmailRequest sendBulkTemplatedEmailRequest = null;
+        List<BulkEmailDestination> bulkEmailDestinationList = new ArrayList<>();
+       // SendBulkTemplatedEmailRequest sendBulkTemplatedEmailRequest = null;
     try{
         for(String dest: bulkEmailWithTemplate.getReceiver()){
             Destination destination = Destination.builder()
@@ -108,7 +96,7 @@ public class SESServiceImpl implements SESService{
 
         }
 
-        sendBulkTemplatedEmailRequest = SendBulkTemplatedEmailRequest.builder()
+        SendBulkTemplatedEmailRequest sendBulkTemplatedEmailRequest = SendBulkTemplatedEmailRequest.builder()
                 .source(bulkEmailWithTemplate.getSender())
                 .template(bulkEmailWithTemplate.getTemplateName())
                 .destinations(bulkEmailDestinationList)
@@ -116,6 +104,7 @@ public class SESServiceImpl implements SESService{
                 .build();
 
         client.sendBulkTemplatedEmail(sendBulkTemplatedEmailRequest);
+        System.out.println(">>sender:"+bulkEmailWithTemplate.getSender());
 
     }catch(Exception e){
         System.out.println("The email was not sent. Error message: " + e.getMessage());
@@ -179,5 +168,19 @@ public class SESServiceImpl implements SESService{
                 .build();
 
         client.deleteTemplate(deleteTemplateRequest);
+    }
+
+    @Override
+    public List<String> listTemplate(SesClient client) {
+
+        List<String>templateList = new ArrayList<>();
+        ListTemplatesRequest listTemplatesRequest = ListTemplatesRequest.builder()
+                .maxItems(20)
+                .build();
+
+        ListTemplatesResponse listTemplatesResponse = client.listTemplates(listTemplatesRequest);
+         listTemplatesResponse.templatesMetadata().forEach(template -> templateList.add(template.name()));
+
+        return templateList;
     }
 }
