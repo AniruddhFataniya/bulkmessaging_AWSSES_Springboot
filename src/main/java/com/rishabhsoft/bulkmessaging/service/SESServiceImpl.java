@@ -80,26 +80,60 @@ public class SESServiceImpl implements SESService{
     @Override
     public void sendBulkEmail(SesClient client, BulkEmailWithTemplate bulkEmailWithTemplate) {
 
-        List<BulkEmailDestination> bulkEmailDestinationList = new ArrayList<>();
+        List<BulkEmailDestination> bulkEmailDestinationListTo = new ArrayList<>();
+        List<BulkEmailDestination>bulkEmailDestinationListCc = new ArrayList<>();
+        List<BulkEmailDestination>bulkEmailDestinationListBcc = new ArrayList<>();
        // SendBulkTemplatedEmailRequest sendBulkTemplatedEmailRequest = null;
     try{
-        for(String dest: bulkEmailWithTemplate.getReceiver()){
-            Destination destination = Destination.builder()
-                    .toAddresses(dest)
+        // to addresses
+        for(String destTo: bulkEmailWithTemplate.getToAddresses()){
+            Destination destinationTo = Destination.builder()
+                    .toAddresses(destTo)
                     .build();
 
-            BulkEmailDestination bulkEmailDestination = BulkEmailDestination.builder()
-                    .destination(destination)
+           BulkEmailDestination bulkEmailDestinationTo = BulkEmailDestination.builder()
+                    .destination(destinationTo)
                     .build();
 
-            bulkEmailDestinationList.add(bulkEmailDestination);
+            bulkEmailDestinationListTo.add(bulkEmailDestinationTo);
 
         }
+
+        // cc addresses
+        for(String destCC: bulkEmailWithTemplate.getCcAddresses()){
+            Destination destinationCC = Destination.builder()
+                    .toAddresses(destCC)
+                    .build();
+
+            BulkEmailDestination bulkEmailDestinationCc = BulkEmailDestination.builder()
+                    .destination(destinationCC)
+                    .build();
+
+            bulkEmailDestinationListCc.add(bulkEmailDestinationCc);
+
+        }
+
+        // bcc addresses
+        for(String destBcc: bulkEmailWithTemplate.getCcAddresses()){
+            Destination destinationBcc = Destination.builder()
+                    .toAddresses(destBcc)
+                    .build();
+
+            BulkEmailDestination bulkEmailDestinationBcc = BulkEmailDestination.builder()
+                    .destination(destinationBcc)
+                    .build();
+
+            bulkEmailDestinationListBcc.add(bulkEmailDestinationBcc);
+
+        }
+
 
         SendBulkTemplatedEmailRequest sendBulkTemplatedEmailRequest = SendBulkTemplatedEmailRequest.builder()
                 .source(bulkEmailWithTemplate.getSender())
                 .template(bulkEmailWithTemplate.getTemplateName())
-                .destinations(bulkEmailDestinationList)
+                .destinations(bulkEmailDestinationListTo)
+                .destinations(bulkEmailDestinationListCc)
+                .destinations(bulkEmailDestinationListBcc)
                 .defaultTemplateData(bulkEmailWithTemplate.getDefaultTemplateData())
                 .build();
 
@@ -175,7 +209,7 @@ public class SESServiceImpl implements SESService{
 
         List<String>templateList = new ArrayList<>();
         ListTemplatesRequest listTemplatesRequest = ListTemplatesRequest.builder()
-                .maxItems(20)
+                .maxItems(30)
                 .build();
 
         ListTemplatesResponse listTemplatesResponse = client.listTemplates(listTemplatesRequest);

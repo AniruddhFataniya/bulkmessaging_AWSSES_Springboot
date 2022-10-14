@@ -10,6 +10,9 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EmailTemplate {
+
+    private Long id;
+
     private String templateName;
 
     private String subjectPart;

@@ -8,6 +8,7 @@ import com.rishabhsoft.bulkmessaging.service.SESService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -52,6 +53,7 @@ public class SESController {
     }
 
     // sending bulk emails with a template
+    @CrossOrigin(origins = "http://localhost:4200")
     @PostMapping("/bulkEmailWithTemplate")
     ResponseEntity<BulkEmailWithTemplate> sendBulkEmailWithTemplate(@RequestBody BulkEmailWithTemplate bulkEmailWithTemplate ){
         service.sendBulkEmail(sesClient,bulkEmailWithTemplate);
@@ -60,8 +62,9 @@ public class SESController {
 
     // creating a template
     @PostMapping("/template")
-    ResponseEntity<EmailTemplate> createTemplate(@RequestBody EmailTemplate template){
+    ResponseEntity<EmailTemplate> createTemplate(@RequestBody EmailTemplate template, Model model){
         service.createTemplate(sesClient,template);
+        model.addAttribute("template", template);
         return new ResponseEntity<>(HttpStatus.OK);
     }
 
@@ -73,9 +76,11 @@ public class SESController {
     }
 
     // getting the list of the templates from SES
+    @CrossOrigin(origins = "http://localhost:4200")
     @GetMapping("/listTemplate")
     public List<String> listTemplate(){
         return service.listTemplate(sesClient);
     }
+
 
 }
