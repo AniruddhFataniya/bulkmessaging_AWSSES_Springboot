@@ -4,19 +4,55 @@ import com.rishabhsoft.bulkmessaging.model.BulkEmailWithTemplate;
 import com.rishabhsoft.bulkmessaging.model.Email;
 import com.rishabhsoft.bulkmessaging.model.EmailTemplate;
 import com.rishabhsoft.bulkmessaging.model.EmailWithTemplate;
+import com.rishabhsoft.bulkmessaging.repository.EmailRepository;
+import com.rishabhsoft.bulkmessaging.repository.EmailTemplateRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
+import org.springframework.context.annotation.ScopedProxyMode;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import software.amazon.awssdk.services.ses.SesClient;
 import software.amazon.awssdk.services.ses.model.*;
 import software.amazon.awssdk.services.ses.model.Destination;
 
 import javax.mail.MessagingException;
+import javax.transaction.Transactional;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
+@Scope(proxyMode = ScopedProxyMode.INTERFACES)
+@Transactional
 public class SESServiceImpl implements SESService{
 
+    @Autowired
+    EmailRepository emailRepository;
+
+    @Autowired
+    EmailTemplateRepository emailTemplateRepository;
+
+    EmailTemplate emailTemplate;
+
+    @Override
+    public void createIdentity(SesClient client, String identity) {
+
+        VerifyEmailIdentityRequest verifyEmailIdentityRequest = VerifyEmailIdentityRequest.builder()
+                .emailAddress(identity)
+                .build();
+
+        client.verifyEmailIdentity(verifyEmailIdentityRequest);
+    }
+
+    @Override
+    public void deleteIdentity(SesClient client, String identity) {
+        DeleteIdentityRequest deleteIdentityRequest = DeleteIdentityRequest.builder()
+                .identity(identity)
+                .build();
+
+        client.deleteIdentity(deleteIdentityRequest);
+    }
 
     @Override
     public List<String> getIdentity(SesClient client) throws IOException {
@@ -30,6 +66,29 @@ public class SESServiceImpl implements SESService{
             System.err.println(e.awsErrorDetails().errorMessage());
             return null;
         }
+
+    }
+
+    @Override
+    public Boolean searchIdentity(String identity, SesClient client) throws IOException {
+        List<String> identities;
+        identities = getIdentity(client);
+        int flag = 0;
+
+        for(String id: identities){
+            if(id.equals(identity)){
+                flag = 1;
+                break;
+            }
+        }
+        if(flag == 1)
+        {
+            return true;
+        }
+        else{
+            return false;
+        }
+
 
     }
 
@@ -80,13 +139,21 @@ public class SESServiceImpl implements SESService{
     @Override
     public void sendBulkEmail(SesClient client, BulkEmailWithTemplate bulkEmailWithTemplate) {
 
+        String receiverName = bulkEmailWithTemplate.getName();
+        if(receiverName== null){
+            receiverName = "customer";
+        }
+
+
         List<BulkEmailDestination> bulkEmailDestinationListTo = new ArrayList<>();
-        List<BulkEmailDestination>bulkEmailDestinationListCc = new ArrayList<>();
-        List<BulkEmailDestination>bulkEmailDestinationListBcc = new ArrayList<>();
+//        List<BulkEmailDestination>bulkEmailDestinationListCc = new ArrayList<>();
+//        List<BulkEmailDestination>bulkEmailDestinationListBcc = new ArrayList<>();
        // SendBulkTemplatedEmailRequest sendBulkTemplatedEmailRequest = null;
     try{
+
+        String[] toAdd = StringUtils.commaDelimitedListToStringArray(bulkEmailWithTemplate.getToAddresses());
         // to addresses
-        for(String destTo: bulkEmailWithTemplate.getToAddresses()){
+        for(String destTo: toAdd){
             Destination destinationTo = Destination.builder()
                     .toAddresses(destTo)
                     .build();
@@ -100,7 +167,7 @@ public class SESServiceImpl implements SESService{
         }
 
         // cc addresses
-        for(String destCC: bulkEmailWithTemplate.getCcAddresses()){
+      /*  for(String destCC: bulkEmailWithTemplate.getCcAddresses()){
             Destination destinationCC = Destination.builder()
                     .toAddresses(destCC)
                     .build();
@@ -114,7 +181,7 @@ public class SESServiceImpl implements SESService{
         }
 
         // bcc addresses
-        for(String destBcc: bulkEmailWithTemplate.getCcAddresses()){
+        for(String destBcc: bulkEmailWithTemplate.getBccAddresses()){
             Destination destinationBcc = Destination.builder()
                     .toAddresses(destBcc)
                     .build();
@@ -125,19 +192,29 @@ public class SESServiceImpl implements SESService{
 
             bulkEmailDestinationListBcc.add(bulkEmailDestinationBcc);
 
-        }
-
+        }*/
+    MessageTag messageTag = MessageTag.builder()
+            .name("BulkEmail")
+            .value("status")
+            .build();
 
         SendBulkTemplatedEmailRequest sendBulkTemplatedEmailRequest = SendBulkTemplatedEmailRequest.builder()
                 .source(bulkEmailWithTemplate.getSender())
                 .template(bulkEmailWithTemplate.getTemplateName())
                 .destinations(bulkEmailDestinationListTo)
-                .destinations(bulkEmailDestinationListCc)
-                .destinations(bulkEmailDestinationListBcc)
-                .defaultTemplateData(bulkEmailWithTemplate.getDefaultTemplateData())
+                .configurationSetName("bulkEmailConfigCloudWatch")
+                .defaultTags(messageTag)
+                //.destinations(bulkEmailDestinationListCc)
+                //.destinations(bulkEmailDestinationListBcc)
+
+               //.defaultTemplateData(bulkEmailWithTemplate.getDefaultTemplateData())
+                 //  .defaultTemplateData("{\"name\":\"friend\"}")
+                .defaultTemplateData("{\"name\": "+receiverName+"}")
+
                 .build();
 
         client.sendBulkTemplatedEmail(sendBulkTemplatedEmailRequest);
+
         System.out.println(">>sender:"+bulkEmailWithTemplate.getSender());
 
     }catch(Exception e){
@@ -146,6 +223,12 @@ public class SESServiceImpl implements SESService{
     }
 
 
+    }
+
+    @Override
+    public void saveBulkEmail(BulkEmailWithTemplate bulkEmailWithTemplate) {
+
+        emailRepository.save(bulkEmailWithTemplate);
     }
 
     @Override
@@ -175,6 +258,11 @@ public class SESServiceImpl implements SESService{
 
     @Override
     public void createTemplate(SesClient client, EmailTemplate emailTemplate) {
+        String html;
+
+            html = "<html><body>There is no content in the template</body></html>";
+
+
         Template template = Template.builder()
                 .templateName(emailTemplate.getTemplateName())
                 .subjectPart(emailTemplate.getSubjectPart())
@@ -195,7 +283,13 @@ public class SESServiceImpl implements SESService{
     }
 
     @Override
+    public void saveTemplate(EmailTemplate template) {
+        emailTemplateRepository.save(template);
+    }
+
+    @Override
     public void deleteTemplate(SesClient client, String templateName) {
+
 
         DeleteTemplateRequest deleteTemplateRequest = DeleteTemplateRequest.builder()
                 .templateName(templateName)
@@ -205,16 +299,68 @@ public class SESServiceImpl implements SESService{
     }
 
     @Override
+    public void deleteTemplateFromDb(String templateName) {
+        emailTemplateRepository.deleteByTemplateName(templateName);
+    }
+
+    @Override
     public List<String> listTemplate(SesClient client) {
 
         List<String>templateList = new ArrayList<>();
         ListTemplatesRequest listTemplatesRequest = ListTemplatesRequest.builder()
-                .maxItems(30)
+                .maxItems(10000)
                 .build();
 
         ListTemplatesResponse listTemplatesResponse = client.listTemplates(listTemplatesRequest);
          listTemplatesResponse.templatesMetadata().forEach(template -> templateList.add(template.name()));
 
         return templateList;
+    }
+
+    @Override
+    public List<EmailTemplate> listTemplateFromDb() {
+        return emailTemplateRepository.findAllOrderByCreationDateDesc();
+    }
+
+    @Override
+    public Boolean searchTemplate(SesClient client, String templateName) {
+
+        List<String> templates;
+        templates = listTemplate(client);
+        int flag = 0;
+
+        for(String template: templates){
+            if(template.equals(templateName)){
+                flag = 1;
+                break;
+            }
+        }
+        if(flag == 1)
+        {
+            return true;
+        }
+        else{
+            return false;
+        }
+    }
+
+    @Override
+    public List<BulkEmailWithTemplate> getEmailHistory() {
+        return emailRepository.findAll();
+    }
+
+    @Override
+    public void clearEmailHistory() {
+        emailRepository.deleteAll();
+    }
+
+    @Override
+    public Long templateCount() {
+        Long templateCount;
+        Long remainingTemplate;
+        templateCount = emailTemplateRepository.count();
+        System.out.println("templateCount:"+templateCount);
+        remainingTemplate = 10000 - templateCount;
+        return remainingTemplate;
     }
 }
